@@ -82,7 +82,7 @@ app$layout(
                 style = css$box,
                 options = map(state_list, function(col) list(label = col, value = col)),
                 multi = TRUE,
-                value = c('Colorado')
+                value = state_list
               ),
               htmlBr(),
               htmlBr(),
@@ -159,6 +159,7 @@ app$callback(
       filter(State %in% state) %>%
       filter(between(year, year_range[1], year_range[2])) %>%
       pivot_longer(cols = unlist(crime), names_to = "crime_type", values_to = "crime_metric") %>%
+      mutate(crime_type = factor(crime_type, levels = crime)) %>%
       group_by(year, State, crime_type) %>%
       summarise(sum_crime = sum(crime_metric)) %>%
       ggplot(aes(x = year, y = sum_crime, color = crime_type)) +
