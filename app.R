@@ -32,6 +32,14 @@ state_list <- unique(data_crime %>%
                        drop_na() %>%
                        pull(State))
 
+map_data <- function(map_df, state_name, crime_name, year_) {
+  map_df %>% filter(State %in% state_name) %>%
+    filter(between(year, year_[1], year_[2])) %>%
+    select(append(crime_name, c("year", "Abbreviation", "State"))) %>%
+    mutate(crime_sum = rowSums(.[1:length(crime_name)])) %>% 
+    mutate(hover = paste0(State, " ", round(crime_sum, 2)))
+}
+
 app <- Dash$new(external_stylesheets = dbcThemes$BOOTSTRAP)
 
 custom_css <- function() {
@@ -158,6 +166,36 @@ app$callback(
       labs(x = "Year", y = metric, color = "Crime Type")
     
     ggplotly(trend) 
+  })
+
+app$callback(
+  output('geo_chart', 'figure'),
+  list(input('state', 'value'),
+       input('crime', 'value'),
+       input('year_range', 'value'),
+       input('metric', 'value')),
+  function(state, crime, year_range, metric){
+    
+    selected_crime_cols <- crime_cols[c('crime_name', metric)] %>%
+      filter(crime_name %in% crime) %>%
+      pull(-crime_name)
+    
+    map_fnl_data <- map_data(data_crime, state,
+                             crime_name = selected_crime_cols,
+                             year_ = year_range)
+    
+    plot_geo(map_fnl_data, 
+             locationmode = 'USA-states') %>% 
+      add_trace(locations = ~Abbreviation,
+                z = ~crime_sum, name = "Crime Count",
+                zmin = min(map_fnl_data$crime_sum),
+                zmax = max(map_fnl_data$crime_sum),
+                text = ~hover,
+                hoverinfo = 'text'
+      ) %>% 
+      layout(geo = list(scope = 'usa')) %>%
+      colorbar(title = metric)
+
   })
 
 app$run_server()
