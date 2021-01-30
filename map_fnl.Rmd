@@ -1,0 +1,54 @@
+---
+title: "map_fnl"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(plotly)
+library(ggplot2)
+library(dplyr)
+library(rlang)
+
+# Data Pre-processing, Adding states 
+data_raw <- read.csv('./data/raw/ucr_crime_1975_2015.csv')
+data_raw$state.abb <- substr(data_raw$ORI, start = 1, stop = 2)
+df <- inner_join(data_raw, read.csv('./data/raw/states.csv'), by = c('state.abb' = 'Code')) %>%
+  rename(state = ï..State)
+
+
+# This function prepares the filtered data that is used in map
+map_data <- function(map_df, state_name, crime_name, year_) {
+  map_df %>% filter(state.abb %in% state_name, year %in% year_) %>% 
+    select(crime_name,year,state.abb,state) %>% 
+    mutate(crime_sum = rowSums(.[1:length(crime_name)])) %>% 
+    mutate(hover = paste0(state, " ", round(crime_sum,2)))
+}
+
+# This function call needs data dynamically from filter section of the dash board
+map_fnl_data <- map_data(df, state_name = c('TX','CA'),
+                         crime_name = c('violent_per_100k','homs_per_100k','agg_ass_per_100k'),
+                         year_ = seq(1975,1980,1)) 
+
+# This function plots the map and takes filtered data frame as input
+plt_map <- function(df_for_map){
+  plot_geo(df_for_map, 
+           locationmode = 'USA-states',
+           frame = ~year) %>% 
+    add_trace(locations = ~state.abb,
+              z = ~crime_sum,
+              zmin = min(df_for_map$crime_sum),
+              zmax = max(df_for_map$crime_sum),
+              text = ~hover,
+              hoverinfo = 'text'            
+              ) %>% 
+    layout(geo = list(scope = 'usa'))
+}
+
+# Function call to plot map with filtered data
+plt_map(map_fnl_data)
+```
