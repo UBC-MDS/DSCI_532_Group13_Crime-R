@@ -6,12 +6,16 @@ library(ggplot2)
 library(plotly)
 library(tidyverse)
 library(stringr)
+library(purrr)
 
 data_raw <- read.csv("data/raw/ucr_crime_1975_2015.csv")
 
-crime_list <- list('Homicide', 'Rape', 'Larceny', 'Violent')
-sum_list <- list('homs_sum', 'rape_sum', 'rob_sum', 'violent_crime')
-rate_list <- list('homs_per_100k', 'rape_per_100k', 'rob_per_100k', 'violent_per_100k')
+crime_list <- c('Homicide', 'Rape', 'Larceny', 'Violent')
+sum_list <- c('homs_sum', 'rape_sum', 'rob_sum', 'violent_crime')
+rate_list <- c('homs_per_100k', 'rape_per_100k', 'rob_per_100k', 'violent_per_100k')
+crime_cols <- tibble(crime_name = crime_list,
+                     `Crime Count` = sum_list,
+                     `Crime Rate` = rate_list)
 
 data_processing <- function(data){
   data <- data %>%
@@ -61,16 +65,14 @@ app$layout(
           dbcCol(
             id = 'filter-panel',
             style = css$filter_panel,
-            md = 4,
+            md = 3,
             list(
               htmlBr(),
               dbcLabel("STATE"),
               dccDropdown(
                 id = 'state',
                 style = css$box,
-                options = list(list(label = 'Colorado', value = 'Colorado'),
-                               list(label = 'Texas', value = 'Texas'),
-                               list(label = 'Georgia', value = 'Georgia')),
+                options = map(state_list, function(col) list(label = col, value = col)),
                 multi = TRUE,
                 value = c('Colorado')
               ),
@@ -80,10 +82,7 @@ app$layout(
               dccDropdown(
                 id = 'crime',
                 style = css$box,
-                options = list(list(label = 'Homicide', value = 'Homicide'),
-                               list(label = 'Larceny', value = 'Larceny'),
-                               list(label = 'Rape', value = 'Rape'),
-                               list(label = 'Violent', value = 'Violent')),
+                options = map(crime_list, function(col) list(label = col, value = col)),
                 multi = TRUE,
                 value = c('Homicide', 'Larceny', 'Rape', 'Violent')
               ),
@@ -102,7 +101,7 @@ app$layout(
                   "2005" = "2005",
                   "2015" = "2015"
                 ),
-                value = list(1975, 1995)
+                value = list(1975, 2015)
               ),
               htmlBr(),
               htmlBr(),
@@ -110,17 +109,17 @@ app$layout(
               dccRadioItems(
                 id = "metric",
                 options = list(
-                  list(label = "Rate ", value = "rate"),
-                  list(label = "Number", value = "number"))
+                  list(label = "Rate", value = "Crime Rate"),
+                  list(label = "Number", value = "Crime Count")),
+                value = "Crime Rate"
                 )
             )
           ),
           dbcCol(
-            id = 'trend_chart',
             md = 9,
             list(
-              dccGraph(id='trend_chart_1'),
-              dccGraph(id='trend_chart_2')
+              dccGraph(id='geo_chart'),
+              dccGraph(id='trend_chart')
             )
             
           )
@@ -132,17 +131,33 @@ app$layout(
 )
 
 app$callback(
-  output('trend_chart_1', 'figure'),
+  output('trend_chart', 'figure'),
   list(input('state', 'value'),
        input('crime', 'value'),
        input('year_range', 'value'),
        input('metric', 'value')),
   function(state, crime, year_range, metric){
-    trend <- data_crime %>%
-      ggplot(aes(x = year, y = homs_sum)) +
-      geom_line(stat = 'summary', fun = sum)
     
-    ggplotly(trend)
+    selected_crime_cols <- crime_cols[c('crime_name', metric)] %>%
+      filter(crime_name %in% crime) %>%
+      pull(-crime_name)
+    
+    trend_df <- data_crime %>%
+      select(year, State, selected_crime_cols)
+    
+    colnames(trend_df) <- append(c("year", "State"), unlist(crime))
+    
+    trend <- trend_df %>%
+      filter(State %in% state) %>%
+      filter(between(year, year_range[1], year_range[2])) %>%
+      pivot_longer(cols = unlist(crime), names_to = "crime_type", values_to = "crime_metric") %>%
+      group_by(year, State, crime_type) %>%
+      summarise(sum_crime = sum(crime_metric)) %>%
+      ggplot(aes(x = year, y = sum_crime, color = crime_type)) +
+      geom_line(stat = 'summary', fun = sum) +
+      labs(x = "Year", y = metric, color = "Crime Type")
+    
+    ggplotly(trend) 
   })
 
 app$run_server()
