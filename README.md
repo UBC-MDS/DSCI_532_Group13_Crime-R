@@ -8,7 +8,7 @@ Charles Suresh | @charlessuresh  |
 
 ## Dashboard Link
 
-https://crime-dashboard-group13.herokuapp.com
+https://crime-rate-usa-r.herokuapp.com/
 
   
 ## Description of The App
