@@ -7,7 +7,7 @@ library(plotly)
 library(tidyverse)
 library(stringr)
 library(purrr)
-
+here::here()
 data_raw <- read.csv("data/raw/ucr_crime_1975_2015.csv")
 
 crime_list <- c('Homicide', 'Rape', 'Larceny', 'Violent')
@@ -199,4 +199,4 @@ app$callback(
 
   })
 
-app$run_server()
+app$run_server(host = '0.0.0.0')
