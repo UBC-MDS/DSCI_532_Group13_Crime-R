@@ -166,7 +166,7 @@ app$callback(
       geom_line(stat = 'summary', fun = sum) +
       labs(x = "Year", y = metric, color = "Crime Type")
     
-    ggplotly(trend) 
+    ggplotly(trend)
   })
 
 app$callback(
